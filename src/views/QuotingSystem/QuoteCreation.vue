@@ -67,6 +67,7 @@
 									type="text"
 									style="margin-top: 10px;"
 									></b-form-input>  
+									<p>Quantity</p>
         <b-form-input v-model="customQuantity"
 									placeholder="Enter a quantity"
                   name="customQuantity"
@@ -74,6 +75,7 @@
 									style="margin-top: 10px;"
 									v-validate="'required|min_value:1'"></b-form-input> 
                   <p class="text-danger" v-if="errors.has('customQuantity')">{{ errors.first('customQuantity') }}</p>
+				  <p>Price</p>
         <b-form-input v-model="customPrice"
 									placeholder="Enter a price"
                   name="customPrice"
@@ -83,6 +85,7 @@
                   step="1"
 									v-validate="'required|decimal:2|min_value:0.01'"></b-form-input>                   
                   <p class="text-danger" v-if="errors.has('customPrice')">{{ errors.first('customPrice') }}</p>
+				  <b-button @click="validateBeforeSubmit" variant="outline-primary" style="margin-top: 5px;">Add Custom plant</b-button>
 		  <hr>
 			</b-collapse>
     </div>
@@ -134,13 +137,15 @@
     <p v-if="showAddCollapse" style="color: red;"><b>Plants will be added from the Custom Add dropdown!</b></p>														
 		<p v-else>Please add plants to the quote to save</p>			
 		
-		<b-button @click="validateBeforeSubmit" variant="outline-primary" style="margin-top: 5px;">Add plant</b-button>
+		
 		<br>
 		<br> -->
+		
+
 		<b-button @click="openPlantPickerModal" variant="success" style="margin-top: 5px;">Search for plants to add to quote</b-button>		
 <!-- <strong>Next Calculated Price £{{nextCalculatedPrice}}</strong>							 -->
 	<!-- <strong>Qtn needed until next band {{untilNextBand}}</strong> -->
-		<b-button @click="saveQuote" v-if="totalPrice != 0" variant="outline-success" style="margin-top: 5px;">Save Quote</b-button>	
+		<b-button @click="saveQuote" v-if="totalPrice != 0" variant="outline-success" style="margin-top: 5px;"><p v-if="showCalculatePrice">Calculate Prices</p><p v-else>Save Quote</p></b-button>	
 	</div>
 		<div class="right-div" id="right">
 			<strong>Quote Price: £{{computedTotalPrice}}</strong>
@@ -154,7 +159,16 @@
         <strong>Add a plant to the quote</strong>
       </div>
       <template slot="Price" slot-scope="row">
-        £{{(row.item.Price/100).toFixed(2)}}
+        <b>£{{(row.item.Price/100).toFixed(2)}}</b>
+      </template>
+	  <template slot="PurchasingPrice" slot-scope="row">
+        £{{(row.item.PurchasingPrice/100).toFixed(2)}}
+      </template> 
+	  <template slot="WholesalePrice" slot-scope="row">
+       £{{(row.item.WholesalePrice/100).toFixed(2)}}
+      </template> 
+	   <template slot="OriginalPrice" slot-scope="row">
+        £{{(row.item.OriginalPrice/100).toFixed(2)}}
       </template> 
 			<template slot="actions" slot-scope="row">
 				<b-button type="button" class="btn btn-success action-btn" @click.stop="editItem(row.item, row.index)"><i class="far fa-edit fa-lg" style="color:black"></i></b-button>
@@ -271,6 +285,12 @@
 										<!-- </b-input-group-append> -->
 								<!-- </b-input-group> -->
 							</template>
+							<template slot="WholesalePrice" slot-scope="row">
+								<b>£{{(row.item.WholesalePrice/100).toFixed(2)}}</b>
+							</template>
+							<template slot="PurchasingPrice" slot-scope="row">
+								£{{(row.item.PurchasingPrice/100).toFixed(2)}}
+							</template> 
 						</b-table>
 						</div>
 					</div>
@@ -279,6 +299,7 @@
 					</div>
 			</div>
 			<div v-if="showAddingPlantSection">
+				{{selectedRowFromSearch}}
 				<div class="row">
 					<div class="col-xs-12 col-md-12 pull-left">
 							<p>Plant Name: {{selectedRowFromSearch.PlantName}}</p>
@@ -393,17 +414,22 @@ export default {
         { key: 'FormSize', label: 'Form Size'},
         { key: 'Comment', label: 'Comment'},
         { key: 'Quantity', label: 'Quantity', sortable: true},
-        { key: 'Price', label: 'Item Price', sortable: true, contenteditable: true},
+		{ key: "PurchasingPrice", label: "Purchasing Price"},
+        { key: "WholesalePrice", label: "Wholesale Price", sortable:true, tdClass: 'boldText'},
+		{ key: "OriginalPrice", label: "Original Price", sortable:true},
+		{ key: 'Price', label: 'Item Price', sortable: true, contenteditable: true},
         { key: 'actions', label: 'Actions' }
 			],
 			searchedPlantFields: [
+		{ key: "BatchId", label: "Batch Id"},
         { key: "PlantName", label: "Plant Name", sortable: true },
         { key: "FormSize", label: "Form Size" },
         { key: "Location", label: "Location" },
         { key: "BatchQuantity", label: "Saleable", sortable: true },
         { key: "GrowingQuantity", label: "Growing", sortable: true },
         { key: "AllocatedQuantity", label: "Allocated", sortable: true },
-        { key: "WholesalePrice", label: "Wholesale Price", sortable:true},
+		{ key: "PurchasingPrice", label: "Purchasing Price"},
+        { key: "WholesalePrice", label: "Wholesale Price", sortable:true, tdClass: 'boldText'},
         { key: "actions", label: "Actions" }
       ],
 			isLoading: true,
@@ -456,6 +482,7 @@ export default {
 			selectedPlantNameFilter: null,
 			selectedFormSizeFilter: null,
 			selectedLocationFilter: null,
+			showCalculatePrice: true,
 		}		
 	},
   methods: {
@@ -511,28 +538,73 @@ export default {
 				}
 			}
 		},
+		searchArr(nameKey, myArray){
+			 for (var i=0; i < myArray.length; i++) {
+				if (myArray[i].name === nameKey) {
+					return myArray[i];
+    		}
+			}
+		},
 		saveQuote() {
-			this.axios.post('https://ahillsquoteservice.azurewebsites.net/api/quote', {
-        		CustomerRef: this.customerInfo.CustomerReference,
-				TotalPrice: this.totalPrice,
-				Date: this.quoteDate,
-				ExpiryDate: this.expiryDate,
-				SiteRef: this.siteRef,
-				SalesOrder: 0,
-				Retail: this.customerInfo.CustomerIsWholesale,
-				Active: true,
-				QuoteDetails: this.plants,
-				VAT: 0,
-			}) 
-			.then((response) => {
-				console.log(response);
-				this.quoteId = response.data //Get the quoteId that is returned by the server to display on PDF
-				this.$refs.createPDFModal.show()
-			})
-			.catch((error) => {
-				alert("Please check values before submitting")
-				console.log(error);
-			});
+			//Do the min max check on all the prices on the quote to see if any of them change
+			if (this.showCalculatePrice) {
+				let calculatePricesObject = [];
+				this.plants.forEach((x) => { 
+					if (x.BatchId != 0) {
+						calculatePricesObject.push({BatchId: parseInt(x.BatchId), PriceIn: x.Price.toString()});
+					}
+				});
+				this.axios.post('https://ahillsquoteservice.azurewebsites.net/api/formpricing/list',
+					calculatePricesObject
+				) 
+				.then((response) => {
+					console.log("Prices returned from form pricing api");
+					response.data.forEach(x => {
+						//loop through response which will have the batchId and the prices
+						for (var i=0; i < this.plants.length; i++) {
+							//Loop though the plants that are on the quote and find the one that matches response
+							if (this.plants[i].BatchId === x.BatchId) {
+								console.log(x)
+								console.log("------")
+								//If the price is not the same after calculating it we need to update 
+								if(x.PriceIn != x.PriceOut) {
+									//Update the price as it will be different with the coming out from data
+									this.plants[i].Price = x.PriceOut
+									this.plants[i]._cellVariants = { Price: 'danger' }
+								}
+							}
+    					}
+					this.getTotalPrice();
+					});
+				})
+				.catch((error) => {
+					alert("Please check values before submitting")
+					console.log(error);
+				});
+				this.showCalculatePrice = false;
+			} else {
+				this.axios.post('https://ahillsquoteservice.azurewebsites.net/api/quote', {
+					CustomerRef: this.customerInfo.CustomerReference,
+					TotalPrice: this.totalPrice,
+					Date: this.quoteDate,
+					ExpiryDate: this.expiryDate,
+					SiteRef: this.siteRef,
+					SalesOrder: 0,
+					Retail: this.customerInfo.CustomerIsWholesale,
+					Active: true,
+					QuoteDetails: this.plants,
+					VAT: 0,
+				}) 
+				.then((response) => {
+					console.log(response);
+					this.quoteId = response.data //Get the quoteId that is returned by the server to display on PDF
+					this.$refs.createPDFModal.show()
+				})
+				.catch((error) => {
+					alert("Please check values before submitting")
+					console.log(error);
+				});
+			}
 		},
     validateBeforeSubmit(e) { //Check that all validation passes before adding
       if(this.showAddCollapse != true){
@@ -565,33 +637,42 @@ export default {
 			});
 		},
 		addToList(searchAgain) {
-      if(this.showAddCollapse == true) {
-        this.plants.push({
-          PlantName: this.customPlantName,
-          FormSize: this.customFormSize,
-          Comment: this.customComment,
-          Quantity: this.customQuantity,
-          Price: this.customPrice,
-          Active: true,
-        });
-				this.showAddCollapse = false;
-				 this.customPlantName = "";
-				this.customFormSize = "";
-				this.customComment = null;
-				this.customQuantity = null;
-				this.customPrice = null;
-      }
-      else {
-        this.plants.push({
-          PlantName: this.selectedRowFromSearch.PlantName,
-          FormSize: this.selectedRowFromSearch.FormSize,
-          Quantity: this.quantity,
-          Comment: this.comment,
-          Price: Math.trunc((this.calculatedPrice)*100), //Remove any trailing decimals so that it can be saved as an integer
-          Active: true,
-          _rowVariant: this.checkIfBatchHasPrice(this.selectedRowFromSearch.WholesalePrice), //Pass to method
-			  });
-      }
+			if(this.showAddCollapse == true) {
+				this.plants.push({
+				BatchId: 0,
+				PlantName: this.customPlantName,
+				FormSize: this.customFormSize,
+				Comment: this.customComment,
+				Quantity: this.customQuantity,
+				Price: this.customPrice,
+				WholesalePrice: 0,
+				PurchasingPrice: 0,
+				OriginalPrice: 0,
+				Active: true,
+				});
+						this.showAddCollapse = false;
+						this.customPlantName = "";
+						this.customFormSize = "";
+						this.customComment = null;
+						this.customQuantity = null;
+						this.customPrice = null;
+			}
+			else {
+				console.log(this.selectedRowFromSearch)
+				this.plants.push({
+				BatchId: this.selectedRowFromSearch.BatchId,
+				PlantName: this.selectedRowFromSearch.PlantName,
+				FormSize: this.selectedRowFromSearch.FormSize,
+				Quantity: this.quantity,
+				Comment: this.comment,
+				Price: Math.trunc((this.calculatedPrice)*100), //Remove any trailing decimals so that it can be saved as an integer
+				WholesalePrice: this.selectedRowFromSearch.WholesalePrice,
+				PurchasingPrice: this.selectedRowFromSearch.PurchasingPrice,
+				OriginalPrice: Math.trunc((this.calculatedPrice)*100),
+				Active: true,
+				_rowVariant: this.checkIfBatchHasPrice(this.selectedRowFromSearch.WholesalePrice), //Pass to method
+					});
+			}
 			
 			this.getTotalPrice(); //Once a plant is added recalculate the current quote price
 			//Reset input and validation
@@ -652,6 +733,7 @@ export default {
 			this.selectedPlantNameFilter = null;
 			this.selectedFormSizeFilter = null;
 			this.selectedLocationFilter = null;
+			this.showCalculatePrice = true;
 		},
 		searchAgain()
 		{
@@ -737,6 +819,7 @@ export default {
 		},
 		searchForPlant()
     	{
+			console.log(this.plantSearch);
         this.axios.get("https://ahillsbatchservice.azurewebsites.net/api/search?searchQuery=" +
             this.plantSearch
         )
@@ -744,9 +827,10 @@ export default {
 					var tempPNF = [];
 					var tempFSF = [];
 					var tempLF = [];
+					this.currentSearchedPlants = [];
           for (var i = 0; i < response.data.length; i++) {
             this.currentSearchedPlants.push({
-              BatchId: response.data[i].Id,
+              BatchId: response.data[i].BatchId,
               PlantName: response.data[i].Name,
               FormSize: response.data[i].FormSize,
               Location: response.data[i].Location,
@@ -754,6 +838,7 @@ export default {
               GrowingQuantity: response.data[i].GrowingQuantity,
               AllocatedQuantity: response.data[i].AllocatedQuantity,
               WholesalePrice: response.data[i].WholesalePrice,
+			  PurchasingPrice: response.data[i].PurchasingPrice,
 						});
 						
 						tempPNF.push(response.data[i].Name);
@@ -779,26 +864,46 @@ export default {
 				//Going to try deal with this fucking god afwul function that works of the price by communicating to firebase? Need to just put these into the database.
 				//Then you can just called them on page load and save them into session storage because fuck using this 
 				//---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+				let itemTotal = (this.selectedRowFromSearch.WholesalePrice/100)*this.quantity; //get the line total to work out what gpm to use
+				console.log(this.selectedRowFromSearch.WholesalePrice);
 				if(this.customerInfo.CustomerIsWholesale && this.customerInfo.SageCustomer == false) { //If a retail user has been selected use this price for the items on the quote
 					this.calculatedPrice = ((this.selectedRowFromSearch.WholesalePrice/100)*1.5).toFixed(2);
 				} else {
-					var ref = firebase.database().ref("GPM/").orderByKey();
-					let itemTotal = (this.selectedRowFromSearch.WholesalePrice/100)*this.quantity; //get the line total to work out what gpm to use
-					ref.on("value", (snapshot) => {
-						snapshot.forEach((child) => { //Loop through each of the different bands held within firebase
-								var obj = child.val();
-								if(itemTotal >= obj.rowMin && itemTotal <= obj.rowMax) { //If the itemTotal falls between these values a GPM value is used
-									this.currentGPM = ((1-obj.gpm)*100).toFixed(2);
-									//Apply the calculation to work out the price and add it onto the quote
-									this.calculatedPrice = ((this.selectedRowFromSearch.WholesalePrice/100)*obj.gpm).toFixed(2)
-								}
-							});
-					}, 
-					function (error) {
-						console.log("Error: " + error.code);
-					});
+					if (this.selectedRowFromSearch.WholesalePrice/100 > 60) //Use the upper GPM bands
+					{
+						var ref = firebase.database().ref("GPM2/").orderByKey();
+						
+						ref.on("value", (snapshot) => {
+							snapshot.forEach((child) => { //Loop through each of the different bands held within firebase
+									var obj = child.val();
+									if(itemTotal >= obj.rowMin && itemTotal <= obj.rowMax) { //If the itemTotal falls between these values a GPM value is used
+										this.currentGPM = ((1-obj.gpm)*100).toFixed(2);
+										//Apply the calculation to work out the price and add it onto the quote
+										this.calculatedPrice = ((this.selectedRowFromSearch.WholesalePrice/100)*obj.gpm).toFixed(2)
+									}
+								});
+						}, 
+						function (error) {
+							console.log("Error: " + error.code);
+						});	
+					} else {
+						var ref = firebase.database().ref("GPM/").orderByKey();
+						
+						ref.on("value", (snapshot) => {
+							snapshot.forEach((child) => { //Loop through each of the different bands held within firebase
+									var obj = child.val();
+									if(itemTotal >= obj.rowMin && itemTotal <= obj.rowMax) { //If the itemTotal falls between these values a GPM value is used
+										this.currentGPM = ((1-obj.gpm)*100).toFixed(2);
+										//Apply the calculation to work out the price and add it onto the quote
+										this.calculatedPrice = ((this.selectedRowFromSearch.WholesalePrice/100)*obj.gpm).toFixed(2)
+									}
+								});
+						}, 
+						function (error) {
+							console.log("Error: " + error.code);
+						});	
+					}
 				}
-			
 		},
 		getBatchList() {
 			if(sessionStorage.getItem('batchList') != null) {
@@ -926,7 +1031,7 @@ export default {
 		this.getBatchList();
 		this.getQuoteDate();
 		this.getFirebase();
-		
+		this.showCalculatePrice = true;
 	},
 	created() {
 		window.onbeforeunload = function() {
@@ -990,6 +1095,11 @@ export default {
 		margin: 0px;
   }
 
+  .boldText {
+		font-style: italic;
+		font-weight: bold;
+	}
+
   .container {
     box-shadow: 0px 0px 40px lightgray;
   }
@@ -1044,7 +1154,9 @@ export default {
 	#info { order: 1; }
 	#right { order: 3; } 
 
-}
+	}
+
+	
 
 	/* Make the height fit on mobile, just make sure that it fits on any screen smaller than 768 */
 </style>

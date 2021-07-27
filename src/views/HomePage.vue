@@ -30,6 +30,9 @@
         <b-button class="myBtn misc-btn" variant="secondary">Admin Page</b-button>
       </router-link>  
       <b-button class="myBtn misc-btn" variant="secondary" @click="reloadBatches">Refresh values</b-button>
+      <br>
+      <br>
+      <b-button class="myBtn misc-btn" variant="secondary" @click="openPB">PB Pricing</b-button>
       <export-excel 
           :data = "excelBatches"
           worksheet = "BatchList"
@@ -92,6 +95,9 @@ export default {
       .catch((error) => {
           this.quotes = 'Err getting quotes'
       });
+    },
+    openPB() {
+      window.open("http://pannebakkerupload.azurewebsites.net");  
     },
     reduceQuotes(quoteArray) {
       var reducedQuotes = quoteArray.filter((obj) => obj.Active === true); //Reduce the quotes to only the ones that are active (both Quotes and SalesOrder)

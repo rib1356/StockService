@@ -37,7 +37,8 @@
                 <option :value="true">Desc</option>
               </b-form-select>
             </b-input-group>
-            <datepicker placeholder="Select Date"
+            <date-picker v-model="filter" valueType="format" :lang="lang" @change="setFilter"></date-picker>
+            <!-- <datepicker placeholder="Select Date"
                         v-model="selectedDate"
                         :format="customFormatter"
                         @selected="setFilter"
@@ -45,7 +46,7 @@
                         monday-first
                         clear-button
                         bootstrap-styling
-                        ></datepicker>
+                        ></datepicker> -->
             </b-collapse>  
         </div>
       </div>  
@@ -91,7 +92,8 @@
           </b-form-checkbox>
         </b-form-group>                           
         <b-form-group horizontal label="Estimated Date:" v-if="pickListInfo.estDeliv" >
-          <datepicker id="modalDatepicker"
+          <date-picker v-model="pickListInfo.dispatchDate" valueType="format" :lang="lang"></date-picker>
+          <!-- <datepicker id="modalDatepicker"
                     placeholder="Select Estimated Date"
                     :format="customFormatter"
                     @cleared="clearModalDate"
@@ -99,10 +101,11 @@
                     monday-first
                     clear-button
                     bootstrap-styling
-                    ></datepicker>
+                    ></datepicker> -->
         </b-form-group>                            
         <b-form-group horizontal label="Exact Date:" v-else>
-        <datepicker id="modalDatepicker"
+           <date-picker v-model="pickListInfo.dispatchDate" valueType="format" @change="setSelectedDate" :lang="lang"></date-picker>
+        <!-- <datepicker id="modalDatepicker"
                     placeholder="Select Exact Date"
                     :format="customFormatter"
                     @cleared="clearModalDate"
@@ -110,14 +113,14 @@
                     monday-first
                     clear-button
                     bootstrap-styling
-                    ></datepicker>
+                    ></datepicker> -->
         </b-form-group>                            
         <b-form-group horizontal label="Delivery Needed:" >
           <b-form-checkbox v-model="pickListInfo.deliveryNeeded" style="align: left;" buttons>
             {{pickListInfo.deliveryNeeded}}
           </b-form-checkbox>
         </b-form-group>                            
-        <b-button variant="outline-primary" @click="savePickListInfo" block :disabled="btnDisable">Allocate Plants</b-button>
+        <b-button variant="outline-primary" @click="savePickListInfo" block>Allocate Plants</b-button>
         <b-button variant="outline-danger" block @click="hidePickListModal()">Cancel</b-button>
       </b-modal>
   </div>
@@ -126,14 +129,16 @@
 
 <script>
 import moment from 'moment'
-import Datepicker from 'vuejs-datepicker';
+//import Datepicker from 'vuejs-datepicker';
 import QuoteNavbar from '@/components/QuoteNavbar.vue'
+import DatePicker from 'vue2-datepicker';
+import 'vue2-datepicker/index.css';
 // import PickListModel from '@/views//PickListModel.vue'
 export default {
   name: 'ExistingQuotes',
   components: {
     QuoteNavbar,
-    Datepicker,
+    DatePicker,
 	},
   data () {
     return {
@@ -171,8 +176,15 @@ export default {
       selectedDate: '',
       showSaleOrders: false,
       btnDisable: true,
+      lang: {
+          formatLocale: {
+            firstDayOfWeek: 1,
+          },
+          monthBeforeYear: true,
+        },
     }
   },
+  
   computed: {
     sortOptions () {
       // Create an options list from our fields
@@ -188,15 +200,19 @@ export default {
     clearModalDate() {
       this.btnDisable = true;
     },
-    customFormatter(date) { //Return the correct format so that the table dates can be filtered
+    customFormatter(date) {
       return moment(new Date(date)).format('DD/MM/YYYY');
     },
-    setFilter(date) {
-      this.filter = this.customFormatter(date)
+    customFormatterFilter(date) { //Return the correct format so that the table dates can be filtered
+      return moment(new Date(date)).format('DD/M/YYYY');
     },
-    setSelectedDate(date) {
+    setFilter(date) {
+      //this.filter = "Wood"
+      this.filter = this.customFormatterFilter(date)
+    },
+    setSelectedDate() {
       this.btnDisable = false;
-      this.pickListInfo.dispatchDate = this.customFormatter(date);
+      //this.pickListInfo.dispatchDate = this.customFormatter(date);
       console.log(this.pickListInfo.dispatchDate);
     },
     openPickList(row) {
@@ -208,6 +224,9 @@ export default {
       this.$refs['pickListModel'].hide()
     },
     savePickListInfo() {
+      let currentDate = this.pickListInfo.dispatchDate;
+    
+      this.pickListInfo.dispatchDate = this.customFormatter(currentDate);
       sessionStorage.setItem('pickListInfo', JSON.stringify(this.pickListInfo));
       this.$router.push('PlantAllocationRevised');
     },
